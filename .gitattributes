@@ -1,0 +1,2 @@
+# exported data is committed byte for byte (its sha256 is checked)
+data/** -text

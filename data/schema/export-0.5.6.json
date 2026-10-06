@@ -1,0 +1,3107 @@
+{
+ "$schema": "http://json-schema.org/draft-07/schema#",
+ "$id": "bdo-skill-export/0.5.6",
+ "title": "BdoExport",
+ "description": "The website's data export, schema 0.5.6. Three documents per game build: one ClassExport per class (and spec), the Manifest, and the Golden vectors. docs/export-format.md is the prose companion (ids, grades, changelog).",
+ "anyOf": [
+  {
+   "$ref": "#/definitions/ClassExport"
+  },
+  {
+   "$ref": "#/definitions/Manifest"
+  },
+  {
+   "$ref": "#/definitions/Golden"
+  }
+ ],
+ "definitions": {
+  "PublicGrade": {
+   "description": "How a value is known, in public words. game data: read from the shipped files (or a census over them). measured: observed in game. inferred: a rule consistent with the data, not read directly. needs value: not known; an editor fills it.",
+   "type": "string",
+   "enum": [
+    "game data",
+    "measured",
+    "inferred",
+    "needs value"
+   ]
+  },
+  "Spec": {
+   "type": "string",
+   "enum": [
+    "succession",
+    "awakening"
+   ]
+  },
+  "SpecList": {
+   "description": "How a spec lists a skill: pressable (in the skill list), reached_through (not pressable in this spec, reached from another skill), or null (not in the spec).",
+   "type": [
+    "string",
+    "null"
+   ],
+   "enum": [
+    "pressable",
+    "reached_through",
+    null
+   ]
+  },
+  "Speeds": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "attack",
+    "casting",
+    "movement"
+   ],
+   "properties": {
+    "attack": {
+     "type": "number"
+    },
+    "casting": {
+     "type": "number"
+    },
+    "movement": {
+     "type": "number"
+    }
+   }
+  },
+  "Key": {
+   "description": "A game input: Mouse0 (LMB), Mouse1 (RMB), W A S D, Shift, Space, Q E F C Z X, Tab.",
+   "type": "string"
+  },
+  "Keys": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "held": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "press": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "double": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "released": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    }
+   }
+  },
+  "Condition": {
+   "description": "One non-input test of a relationship (a learned skill, a runtime state, an action variable, the class resource, the weapon stance, another test). `named` grades the NAME of the test, not whether it holds.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "kind",
+    "text"
+   ],
+   "properties": {
+    "kind": {
+     "type": "string",
+     "enum": [
+      "learned",
+      "not_learned",
+      "state",
+      "variable",
+      "class_resource",
+      "stance",
+      "test"
+     ]
+    },
+    "text": {
+     "type": "string"
+    },
+    "skill": {
+     "type": "integer",
+     "description": "learned / not_learned: the game skill id"
+    },
+    "id": {
+     "type": "integer",
+     "description": "state: the state's number"
+    },
+    "name": {
+     "type": "string"
+    },
+    "op": {
+     "type": "string"
+    },
+    "value": {
+     "type": "number"
+    },
+    "args": {
+     "type": "array",
+     "items": {
+      "type": "number"
+     }
+    },
+    "named": {
+     "$ref": "#/definitions/PublicGrade"
+    }
+   }
+  },
+  "Assumed": {
+   "description": "A resource / gear / class test the best-case profile assumed met (full resources, gear worn, content on).",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "name",
+    "args",
+    "text"
+   ],
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "args": {
+     "type": "array",
+     "items": {
+      "type": "number"
+     }
+    },
+    "text": {
+     "type": "string"
+    }
+   }
+  },
+  "Clip": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "anim",
+    "start_f",
+    "end_f",
+    "frames"
+   ],
+   "properties": {
+    "anim": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "start_f": {
+     "type": "number",
+     "description": "the clip frame the action starts at"
+    },
+    "end_f": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "description": "the frame it ends at when nothing cancels it (its cut, else the clip length); null when no length is known"
+    },
+    "frames": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "description": "the clip's length in frames (30 per second of animation)"
+    }
+   }
+  },
+  "Clock": {
+   "description": "THE PER-ACTION CLOCK. ms for a clip span [lo, hi) at speeds S: effective frames = the span at `rate`, with each speed event replacing the rate from its frame (for remain*speed*30 frames when remain > 0, else to the end; the last event still covering a frame wins); ms = frames / 30 / (S[pool]/100) * 1000 (pool 'none': 100) plus the slow-motion excess, rounded to 0.1. Golden vectors pin it.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "rate",
+    "pool",
+    "speed_events",
+    "slow_motion",
+    "slow_motion_events"
+   ],
+   "properties": {
+    "rate": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "pool": {
+     "type": "string",
+     "enum": [
+      "attack",
+      "casting",
+      "movement",
+      "none"
+     ]
+    },
+    "speed_events": {
+     "type": "array",
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 3,
+      "description": "[frame, speed, remain seconds (0 or absent = until the end)]"
+     }
+    },
+    "slow_motion": {
+     "type": "boolean"
+    },
+    "slow_motion_events": {
+     "type": "array",
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "[frame, seconds, time scale]"
+     }
+    }
+   }
+  },
+  "Tick": {
+   "description": "One damage hit of an action. Its % per line is damage_lines[line].pct (null = not known).",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "f",
+    "skill",
+    "lines",
+    "area"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "<action>@<frame>#<n>: n counts the action's damage ticks at the same frame"
+    },
+    "f": {
+     "type": "number"
+    },
+    "skill": {
+     "type": "integer",
+     "description": "the game skill id the hit names"
+    },
+    "lines": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "damage line ids '<skill>:<line>'"
+    },
+    "area": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "key into `areas`; null with `area_reason`"
+    },
+    "area_reason": {
+     "type": "string"
+    },
+    "flight": {
+     "$ref": "#/definitions/Flight"
+    },
+    "conditional": {
+     "type": "boolean",
+     "const": true
+    },
+    "if": {
+     "type": "array",
+     "description": "the hit fires when ANY of these holds",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "conditions",
+       "input"
+      ],
+      "properties": {
+       "conditions": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/Condition"
+        }
+       },
+       "input": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   }
+  },
+  "Flight": {
+   "description": "A projectile's flight (game data), except range (inferred). Its impact area is not in the game data.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "speed",
+    "path",
+    "gravity",
+    "launch_offset",
+    "aim",
+    "range",
+    "reported"
+   ],
+   "properties": {
+    "speed": {
+     "type": "number",
+     "description": "units per second"
+    },
+    "path": {
+     "type": [
+      "string",
+      "integer"
+     ],
+     "description": "straight | ground-hugging | ballistic"
+    },
+    "gravity": {
+     "type": "number"
+    },
+    "launch_offset": {
+     "type": "array",
+     "items": {
+      "type": "number"
+     },
+     "minItems": 3,
+     "maxItems": 3
+    },
+    "aim": {
+     "type": "string"
+    },
+    "range": {
+     "type": "integer"
+    },
+    "reported": {
+     "type": "boolean"
+    }
+   }
+  },
+  "Area": {
+   "description": "A melee hit area (game data). Attacker at the origin facing forward; world units (100 per metre, inferred). plus_body: the game adds the attacker's scale and body radius to `radius`.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "kind",
+    "mode",
+    "max_targets",
+    "height_up",
+    "height_down",
+    "height_test",
+    "centre_forward",
+    "radius",
+    "plus_body",
+    "angle_offset"
+   ],
+   "properties": {
+    "kind": {
+     "type": "string",
+     "enum": [
+      "sector",
+      "box"
+     ]
+    },
+    "mode": {
+     "type": "integer"
+    },
+    "max_targets": {
+     "type": "integer"
+    },
+    "height_up": {
+     "type": "number"
+    },
+    "height_down": {
+     "type": "number"
+    },
+    "height_test": {
+     "type": "boolean"
+    },
+    "centre_forward": {
+     "type": "number"
+    },
+    "radius": {
+     "type": "number"
+    },
+    "inner": {
+     "type": "number",
+     "description": "sector: the ring's inner radius"
+    },
+    "half_angle": {
+     "type": "number",
+     "description": "sector: degrees; 180 = full circle"
+    },
+    "width": {
+     "type": "number",
+     "description": "box"
+    },
+    "height": {
+     "type": "number",
+     "description": "box"
+    },
+    "length": {
+     "type": "number",
+     "description": "box"
+    },
+    "plus_body": {
+     "type": "boolean"
+    },
+    "angle_offset": {
+     "type": "number",
+     "description": "degrees"
+    }
+   }
+  },
+  "Row": {
+   "description": "One selection row of an action, in engine order: the edges it offers from `from_f` (own walk rows: from the start). Within a row the FIRST passing edge is taken.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "via",
+    "list"
+   ],
+   "properties": {
+    "via": {
+     "type": "string",
+     "description": "'own' (the action's own walk) or the shared group's name"
+    },
+    "from_f": {
+     "type": "number"
+    },
+    "list": {
+     "type": "string",
+     "description": "key into `edge_lists`: the row's edge ids in engine order"
+    }
+   }
+  },
+  "Edge": {
+   "description": "A RELATIONSHIP: from the action whose row lists it, to an action (and the skill it enters). continuation: the skill's own next action; exit: into another skill (or a skill press); repeat: back into the same action.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "to",
+    "to_skill",
+    "kind",
+    "input",
+    "keys",
+    "conditions",
+    "assumed"
+   ],
+   "properties": {
+    "to": {
+     "type": "string"
+    },
+    "to_skill": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "graph skill key, null for a continuation inside the same skill"
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "continuation",
+      "exit",
+      "repeat"
+     ]
+    },
+    "input": {
+     "type": "string",
+     "description": "the input in plain words"
+    },
+    "keys": {
+     "$ref": "#/definitions/Keys"
+    },
+    "window": {
+     "type": "array",
+     "items": {
+      "type": "number"
+     },
+     "minItems": 2,
+     "maxItems": 2,
+     "description": "[first, last] clip frame of the FROM action, inclusive"
+    },
+    "end": {
+     "type": "boolean",
+     "const": true,
+     "description": "fires when the from action ends"
+    },
+    "commands": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "skill": {
+       "type": "array",
+       "items": {
+        "type": "integer"
+       }
+      },
+      "quickslot": {
+       "type": "array",
+       "items": {
+        "type": "integer"
+       }
+      },
+      "quickslot_skill": {
+       "type": "array",
+       "items": {
+        "type": "integer"
+       }
+      },
+      "quickslot_current": {
+       "type": "array",
+       "items": {
+        "type": "integer"
+       }
+      },
+      "not_quickslot_skill": {
+       "type": "array",
+       "items": {
+        "type": "integer"
+       }
+      }
+     }
+    },
+    "conditions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Condition"
+     }
+    },
+    "assumed": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Assumed"
+     }
+    },
+    "plays": {
+     "type": "string",
+     "description": "for an edge into a skill PRESS (`to` = SKILL_<n>): the action that press plays"
+    }
+   }
+  },
+  "VariableSet": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "f",
+    "var",
+    "op",
+    "value"
+   ],
+   "properties": {
+    "f": {
+     "type": "number"
+    },
+    "var": {
+     "type": "string"
+    },
+    "op": {
+     "type": "string"
+    },
+    "value": {
+     "type": "number"
+    },
+    "never": {
+     "type": "boolean",
+     "const": true
+    },
+    "if": {
+     "type": "array",
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/Condition"
+      }
+     }
+    }
+   }
+  },
+  "Action": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "clip",
+    "clock",
+    "rows"
+   ],
+   "properties": {
+    "clip": {
+     "$ref": "#/definitions/Clip"
+    },
+    "clock": {
+     "$ref": "#/definitions/Clock"
+    },
+    "ticks": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Tick"
+     }
+    },
+    "rows": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Row"
+     }
+    },
+    "sets": {
+     "type": "string",
+     "description": "key into `set_lists`: the action variable writes its frame events make"
+    },
+    "on_cooldown": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "action",
+      "skill_id"
+     ],
+     "properties": {
+      "action": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "skill_id": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      }
+     },
+     "description": "pressed on cooldown, the game plays `action` instead"
+    }
+   }
+  },
+  "Skill": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "key",
+    "ids",
+    "name",
+    "type",
+    "entries",
+    "entry_inputs",
+    "specs"
+   ],
+   "properties": {
+    "key": {
+     "type": "string"
+    },
+    "ids": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     }
+    },
+    "name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "type": {
+     "type": "string"
+    },
+    "entries": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "entry_inputs": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "keys",
+       "not_keys",
+       "text"
+      ],
+      "properties": {
+       "keys": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/Key"
+        }
+       },
+       "not_keys": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/Key"
+        }
+       },
+       "text": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "specs": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "succession",
+      "awakening"
+     ],
+     "properties": {
+      "succession": {
+       "$ref": "#/definitions/SpecList"
+      },
+      "awakening": {
+       "$ref": "#/definitions/SpecList"
+      }
+     }
+    },
+    "on_cooldown": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string"
+     },
+     "description": "{entry action: the action played instead on cooldown}"
+    }
+   }
+  },
+  "DamageLine": {
+   "description": "What one damage line of a skill deals. pct is present only for lines the line rule settles (rule single or agree); otherwise null with a reason, for an editor. Never 0.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "skill",
+    "line",
+    "skill_name",
+    "rule",
+    "pct",
+    "reason",
+    "reason_text",
+    "script_hits",
+    "script_max",
+    "grade",
+    "value_source",
+    "mapping_grade"
+   ],
+   "properties": {
+    "skill": {
+     "type": "integer"
+    },
+    "line": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "skill_name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "rule": {
+     "type": "string",
+     "enum": [
+      "single",
+      "agree",
+      "distinct",
+      "cooldown",
+      "hidden",
+      "summon"
+     ]
+    },
+    "pct": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "exclusiveMinimum": 0
+    },
+    "reason": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "enum": [
+      "distinct",
+      "cooldown",
+      "hidden",
+      "summon",
+      null
+     ]
+    },
+    "reason_text": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "script_hits": {
+     "type": "array",
+     "items": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "description": "the effect script's x N for each term carrying this % (shipped data; empty when hidden)"
+    },
+    "script_max": {
+     "type": "array",
+     "items": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "description": "the effect script's max repeats for each term carrying this % (null = none)"
+    },
+    "grade": {
+     "type": "string",
+     "enum": [
+      "inferred",
+      "needs value"
+     ],
+     "description": "the line's value as a whole: never stronger than its line mapping"
+    },
+    "value_source": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "file",
+      "field",
+      "grade"
+     ],
+     "properties": {
+      "file": {
+       "type": "string"
+      },
+      "field": {
+       "type": "string"
+      },
+      "grade": {
+       "$ref": "#/definitions/PublicGrade"
+      }
+     }
+    },
+    "mapping_grade": {
+     "$ref": "#/definitions/PublicGrade"
+    },
+    "note": {
+     "type": "string"
+    }
+   }
+  },
+  "Segment": {
+   "type": "array",
+   "items": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "number"
+    },
+    {
+     "type": "number"
+    }
+   ],
+   "minItems": 3,
+   "maxItems": 3,
+   "description": "[action, from frame, to frame]"
+  },
+  "PresetTick": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "f",
+    "skill",
+    "line",
+    "lines",
+    "conditional"
+   ],
+   "properties": {
+    "f": {
+     "type": "number"
+    },
+    "skill": {
+     "type": "integer"
+    },
+    "line": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "damage line id (its % is damage_lines[line].pct); null when the hit names no line (`line_reason`)"
+    },
+    "lines": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "conditional": {
+     "type": "boolean"
+    },
+    "line_reason": {
+     "type": "string",
+     "description": "why `line` is null: the hit event names no damage line"
+    }
+   }
+  },
+  "Followup": {
+   "description": "A skill the cast can go into at or after the preset's final hit (ADR 0004 item 5): the time from entering the preset's first action to entering `to`.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "group",
+    "skill",
+    "to",
+    "input",
+    "at",
+    "f",
+    "segments",
+    "ms_100",
+    "cards",
+    "no_card",
+    "opens_f",
+    "true_cancel",
+    "cancel",
+    "raw_row",
+    "ultimate"
+   ],
+   "properties": {
+    "group": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "plain label: the card(s) it enters, the skill, or \"any skill on the hotbar\""
+    },
+    "skill": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "to": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "input": {
+     "$ref": "#/definitions/Input"
+    },
+    "at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "the action the follow-up leaves from"
+    },
+    "f": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "description": "the frame of `at` it opens at"
+    },
+    "segments": {
+     "type": "string",
+     "description": "key into `segment_lists`"
+    },
+    "ms_100": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "plays": {
+     "type": "string",
+     "description": "for a follow-up into a skill PRESS (`to` = SKILL_<n>): the action that press plays"
+    },
+    "cards": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     },
+     "description": "the card(s) the follow-up enters: the first damage of the action it enters, read by the card rule; several when its branches deal several (a `cards` id each)"
+    },
+    "no_card": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "why `cards` is empty ('no damage card: ...'), else null"
+    },
+    "opens_f": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "description": "the clip frame of `at` the exit itself opens at (before clamping to the final hit)"
+    },
+    "true_cancel": {
+     "type": "boolean",
+     "description": "the exit opens before the final hit (the page’s \"true cancel\" tag)"
+    },
+    "cancel": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "$ref": "#/definitions/Cancel"
+      }
+     ]
+    },
+    "hotbar": {
+     "type": "boolean",
+     "const": true,
+     "description": "any skill on the hotbar (a quickslot / console-slot press): one per preset or timeline, the earliest; no card"
+    },
+    "opens": {
+     "type": "string",
+     "enum": [
+      "at start",
+      "mid-action",
+      "at End"
+     ],
+     "description": "where in its action the hotbar row opens"
+    },
+    "grade": {
+     "$ref": "#/definitions/PublicGrade"
+    },
+    "raw_row": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "the engine row (group) the exit is on — not for display"
+    },
+    "ultimate": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "name"
+       ],
+       "properties": {
+        "id": {
+         "type": "integer"
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     ],
+     "description": "entered through a route-only Ultimate (its command opens this route into the base card)"
+    }
+   }
+  },
+  "Preset": {
+   "description": "One cast of one skill reaching a set of damage groups by the path that lands the final hit earliest (ADR 0004 items 2-5). Its time at any speeds = the action clock summed over `segments`.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "skill",
+    "key",
+    "name",
+    "entry",
+    "loop_variant",
+    "variant",
+    "on_cooldown",
+    "kind",
+    "groups",
+    "path",
+    "choices",
+    "segments",
+    "zero_length",
+    "final_hit",
+    "ms_100",
+    "speed_flip",
+    "followups",
+    "card",
+    "card_rule",
+    "card_key",
+    "on_cooldown_via",
+    "specs",
+    "reached_through",
+    "how",
+    "access",
+    "no_entry",
+    "entry_action",
+    "ultimate",
+    "requirements",
+    "distinguishing",
+    "via_hotbar",
+    "how_fallback",
+    "timed",
+    "weapon_switch"
+   ],
+   "properties": {
+    "skill": {
+     "type": "string"
+    },
+    "key": {
+     "type": "string",
+     "description": "<skill>(:<entry action>|@<loop root action>)[~cooldown]|<group>+<group>...; one preset per skill, ENTRY action and group set (the main cast keys its first action, a loop variant its root); a group is <action>[i-j], the 1-based ordinals of its ticks in the action"
+    },
+    "name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "entry": {
+     "type": "object",
+     "properties": {
+      "keys": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/Key"
+       }
+      },
+      "not_keys": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/Key"
+       }
+      },
+      "hold": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/Key"
+       },
+       "description": "the entry keys that must stay down after the entry (press vs hold)"
+      }
+     }
+    },
+    "loop_variant": {
+     "type": "boolean"
+    },
+    "variant": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "a loop variant's root action"
+    },
+    "on_cooldown": {
+     "type": "boolean",
+     "description": "pressed on cooldown, or plays an on-cooldown action (the best-case profile is off cooldown)"
+    },
+    "kind": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "enum": [
+      "simple",
+      "timed",
+      null
+     ]
+    },
+    "groups": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "action",
+       "name",
+       "ticks"
+      ],
+      "properties": {
+       "action": {
+        "type": "string"
+       },
+       "name": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "ticks": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/PresetTick"
+        }
+       }
+      }
+     }
+    },
+    "path": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "choices": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Choice"
+     }
+    },
+    "segments": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Segment"
+     }
+    },
+    "zero_length": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "final_hit": {
+     "type": [
+      "object",
+      "null"
+     ],
+     "properties": {
+      "action": {
+       "type": "string"
+      },
+      "f": {
+       "type": "number"
+      }
+     }
+    },
+    "ms_100": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "speed_flip": {
+     "type": "boolean",
+     "description": "another path is faster at 150% of one speed (flagged, not re-picked)"
+    },
+    "followups": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Followup"
+     }
+    },
+    "card": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "description": "the skill the preset's damage hits name (a `cards` id)"
+    },
+    "card_rule": {
+     "type": "string",
+     "description": "how the card was read from the hits: single skill, or the family-majority rule (docs/presets.md, Cards)"
+    },
+    "card_key": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "<card>(:<entry action>|@<loop root action>)[~cooldown]|<group>+...; unique in a spec file"
+    },
+    "on_cooldown_via": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "'entry' (pressed on cooldown) or 'plays <action>' (plays an on-cooldown action, however reached); null off cooldown"
+    },
+    "specs": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "succession",
+      "awakening"
+     ],
+     "properties": {
+      "succession": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "awakening": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      }
+     },
+     "description": "per spec: the card id the preset is shown under (e.g. Succession: Beak Kick for Absolute: Beak Kick's hits), or null when the spec does not show it"
+    },
+    "reached_through": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "succession",
+      "awakening"
+     ],
+     "properties": {
+      "succession": {
+       "anyOf": [
+        {
+         "type": "null"
+        },
+        {
+         "type": "array",
+         "items": {
+          "$ref": "#/definitions/ReachedVia"
+         }
+        }
+       ]
+      },
+      "awakening": {
+       "anyOf": [
+        {
+         "type": "null"
+        },
+        {
+         "type": "array",
+         "items": {
+          "$ref": "#/definitions/ReachedVia"
+         }
+        }
+       ]
+      }
+     },
+     "description": "per spec: the edges of another kept skill that reach this preset's first action, when its card is shown only because it is reached that way (a superseded Absolute / lower rank, ADR 0004 item 7); else null"
+    },
+    "how": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "the whole preset in a player’s words, one frame-free sentence (docs/presets.md \"How it’s played\"); null when the player does nothing of their own"
+    },
+    "access": {
+     "type": "string",
+     "description": "key into `access_lists`: every way into the preset (item 10)"
+    },
+    "no_entry": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "why the access list is empty, else null"
+    },
+    "entry_action": {
+     "type": "string",
+     "description": "the cast’s first action: the preset is the fastest path for its group set FROM this action"
+    },
+    "ultimate": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "name"
+       ],
+       "properties": {
+        "id": {
+         "type": "integer"
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     ],
+     "description": "entered through a route-only Ultimate (its command opens this route into the base card)"
+    },
+    "requirements": {
+     "type": "array",
+     "description": "buff (ids only; buff.dbss not parsed) and class-resource requirements of the entry (shared by every entering condset) and of each choice",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "kind",
+       "where"
+      ],
+      "properties": {
+       "kind": {
+        "type": "string",
+        "enum": [
+         "buff",
+         "class_resource"
+        ]
+       },
+       "buff": {
+        "type": "integer"
+       },
+       "active": {
+        "type": "boolean"
+       },
+       "op": {
+        "type": "string"
+       },
+       "value": {
+        "type": "number"
+       },
+       "where": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "distinguishing": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "what separates this entry from the other presets of its card with the same visible entry keys (empty when none share them)"
+    },
+    "via_hotbar": {
+     "type": "boolean",
+     "description": "reached only by a hotbar press of the skill: the keyboard rows take an earlier class-resource branch first"
+    },
+    "how_fallback": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "why the sentence leaves a timing out (empty: every step said)"
+    },
+    "timed": {
+     "type": "boolean",
+     "description": "a timed PLAYER action: any choice that is not automatic (a press, release, hold-through, charge, hotbar or skill-command step)"
+    },
+    "weapon_switch": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "name"
+       ],
+       "properties": {
+        "id": {
+         "type": "integer"
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     ],
+     "description": "entered through the class's Awakening weapon switch: its command only switches the weapon and hands off into this card (precedence 2, folded; the input stays on the entry)"
+    }
+   }
+  },
+  "Dropped": {
+   "type": "object",
+   "description": "{reason: {count, names: {name: n}}} — what the exporter left out, by reason and by name.",
+   "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "count",
+     "names"
+    ],
+    "properties": {
+     "count": {
+      "type": "integer"
+     },
+     "names": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "integer"
+      }
+     }
+    }
+   }
+  },
+  "Counts": {
+   "type": "object",
+   "additionalProperties": {
+    "type": "integer"
+   }
+  },
+  "ClassExport": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "schema",
+    "build",
+    "class",
+    "spec",
+    "speeds_default",
+    "provenance",
+    "profile",
+    "spec_scope",
+    "skills",
+    "actions",
+    "edges",
+    "edge_lists",
+    "set_lists",
+    "areas",
+    "damage_lines",
+    "presets",
+    "segment_lists",
+    "presets_status",
+    "damage_source",
+    "counts",
+    "dropped",
+    "presets_family_roots",
+    "cards",
+    "access_lists"
+   ],
+   "properties": {
+    "schema": {
+     "type": "string",
+     "const": "0.5.6"
+    },
+    "build": {
+     "type": "string",
+     "description": "the game-data build stamp"
+    },
+    "class": {
+     "type": "string"
+    },
+    "spec": {
+     "anyOf": [
+      {
+       "$ref": "#/definitions/Spec"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "speeds_default": {
+     "$ref": "#/definitions/Speeds"
+    },
+    "provenance": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "build",
+      "files",
+      "sha256"
+     ],
+     "properties": {
+      "build": {
+       "type": "string"
+      },
+      "files": {
+       "type": "object",
+       "additionalProperties": {
+        "type": "string"
+       },
+       "description": "shipped file -> what is read from it"
+      },
+      "sha256": {
+       "type": "object",
+       "additionalProperties": {
+        "type": "string"
+       },
+       "description": "shipped file -> its content hash"
+      }
+     }
+    },
+    "profile": {
+     "type": "string"
+    },
+    "spec_scope": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string"
+     }
+    },
+    "skills": {
+     "type": "object",
+     "additionalProperties": {
+      "$ref": "#/definitions/Skill"
+     }
+    },
+    "actions": {
+     "type": "object",
+     "additionalProperties": {
+      "$ref": "#/definitions/Action"
+     }
+    },
+    "edges": {
+     "type": "object",
+     "additionalProperties": {
+      "$ref": "#/definitions/Edge"
+     }
+    },
+    "edge_lists": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "description": "list id -> edge ids, shared by every row that offers the same edges"
+    },
+    "set_lists": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/VariableSet"
+      }
+     },
+     "description": "list id -> variable writes, shared by every action that makes the same ones"
+    },
+    "areas": {
+     "type": "object",
+     "additionalProperties": {
+      "$ref": "#/definitions/Area"
+     }
+    },
+    "damage_lines": {
+     "type": "object",
+     "additionalProperties": {
+      "$ref": "#/definitions/DamageLine"
+     }
+    },
+    "presets": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Preset"
+     }
+    },
+    "segment_lists": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/Segment"
+      }
+     },
+     "description": "list id -> segments, shared by follow-ups"
+    },
+    "presets_status": {
+     "type": "string"
+    },
+    "damage_source": {
+     "type": "string",
+     "description": "where the damage lines and hit areas were read"
+    },
+    "counts": {
+     "$ref": "#/definitions/Counts"
+    },
+    "dropped": {
+     "$ref": "#/definitions/Dropped"
+    },
+    "presets_family_roots": {
+     "type": "string",
+     "description": "whether the presets had the skill families (skilltype.dbss) their cast-end rule needs: 'ok', 'unavailable: <reason>', or 'not generated'. export_check fails unless 'ok'."
+    },
+    "cards": {
+     "type": "object",
+     "additionalProperties": {
+      "$ref": "#/definitions/Card"
+     },
+     "description": "card id (a game skill id: the skill the presets' damage hits name, ADR 0004 item 7) -> the card"
+    },
+    "access_lists": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/AccessEntry"
+      }
+     }
+    }
+   }
+  },
+  "Manifest": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "schema",
+    "build",
+    "files",
+    "dropped_total"
+   ],
+   "properties": {
+    "schema": {
+     "type": "string",
+     "const": "0.5.6"
+    },
+    "build": {
+     "type": "string"
+    },
+    "files": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "class",
+       "spec",
+       "sha256",
+       "bytes",
+       "counts",
+       "dropped",
+       "presets_status",
+       "damage_source",
+       "spec_scope",
+       "presets_family_roots"
+      ],
+      "properties": {
+       "class": {
+        "type": "string"
+       },
+       "spec": {
+        "anyOf": [
+         {
+          "$ref": "#/definitions/Spec"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       "bytes": {
+        "type": "integer"
+       },
+       "counts": {
+        "$ref": "#/definitions/Counts"
+       },
+       "dropped": {
+        "type": "object",
+        "additionalProperties": {
+         "type": "integer"
+        }
+       },
+       "presets_status": {
+        "type": "string"
+       },
+       "damage_source": {
+        "type": "string"
+       },
+       "spec_scope": {
+        "type": "object",
+        "additionalProperties": {
+         "type": "string"
+        }
+       },
+       "presets_family_roots": {
+        "type": "string",
+        "description": "whether the presets had the skill families (skilltype.dbss) their cast-end rule needs: 'ok', 'unavailable: <reason>', or 'not generated'. export_check fails unless 'ok'."
+       }
+      }
+     }
+    },
+    "dropped_total": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "integer"
+     }
+    }
+   }
+  },
+  "GoldenClock": {
+   "type": "array",
+   "items": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "number"
+    },
+    {
+     "type": "number"
+    },
+    {
+     "type": "string"
+    },
+    {
+     "type": "number"
+    }
+   ],
+   "minItems": 5,
+   "maxItems": 5,
+   "description": "[action, lo, hi, speed set name, ms]: the action's clock over [lo, hi) must give ms (to 0.1)"
+  },
+  "Golden": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "schema",
+    "build",
+    "speed_sets",
+    "files"
+   ],
+   "properties": {
+    "schema": {
+     "type": "string",
+     "const": "0.5.6"
+    },
+    "build": {
+     "type": "string"
+    },
+    "speed_sets": {
+     "type": "object",
+     "additionalProperties": {
+      "$ref": "#/definitions/Speeds"
+     }
+    },
+    "files": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "clock",
+       "presets"
+      ],
+      "properties": {
+       "clock": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/GoldenClock"
+        }
+       },
+       "presets": {
+        "type": "array",
+        "items": {
+         "type": "array",
+         "items": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "string"
+          },
+          {
+           "type": [
+            "number",
+            "null"
+           ]
+          }
+         ],
+         "minItems": 3,
+         "maxItems": 3
+        },
+        "description": "[preset key, speed set name, ms]: the clock summed over the preset's segments"
+       }
+      }
+     }
+    }
+   }
+  },
+  "Card": {
+   "description": "A skill as the site shows it: the game skill id the presets' damage hits name, its tree facts, and per spec whether (and as which skill) it is shown.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "name",
+    "param",
+    "family_root",
+    "rank",
+    "max_rank",
+    "kind",
+    "graph_skills",
+    "presets",
+    "specs",
+    "links_grade",
+    "access"
+   ],
+   "properties": {
+    "id": {
+     "type": "integer"
+    },
+    "name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "param": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "enum": [
+      "normal",
+      "awaken",
+      "succession",
+      null
+     ]
+    },
+    "family_root": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "rank": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "max_rank": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "skill",
+      "black_spirit",
+      "no_damage",
+      "summon"
+     ]
+    },
+    "bs_of": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     },
+     "description": "a Black Spirit skill's bases"
+    },
+    "version": {
+     "type": "integer",
+     "description": "the skill's alternate version (a `Succession: X` skill when succession-type)"
+    },
+    "graph_skills": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "the skills (`skills` keys) whose input reaches the card's presets"
+    },
+    "presets": {
+     "type": "integer"
+    },
+    "specs": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "succession",
+      "awakening"
+     ],
+     "properties": {
+      "succession": {
+       "anyOf": [
+        {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "as",
+          "as_name"
+         ],
+         "properties": {
+          "as": {
+           "type": "integer"
+          },
+          "as_name": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "reached_through": {
+           "type": "array",
+           "items": {
+            "$ref": "#/definitions/ReachedVia"
+           }
+          }
+         }
+        },
+        {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "reason"
+         ],
+         "properties": {
+          "reason": {
+           "type": "string"
+          }
+         }
+        }
+       ]
+      },
+      "awakening": {
+       "anyOf": [
+        {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "as",
+          "as_name"
+         ],
+         "properties": {
+          "as": {
+           "type": "integer"
+          },
+          "as_name": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "reached_through": {
+           "type": "array",
+           "items": {
+            "$ref": "#/definitions/ReachedVia"
+           }
+          }
+         }
+        },
+        {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "reason"
+         ],
+         "properties": {
+          "reason": {
+           "type": "string"
+          }
+         }
+        }
+       ]
+      }
+     }
+    },
+    "links_grade": {
+     "$ref": "#/definitions/PublicGrade",
+     "description": "grade of the Black Spirit / version link (the tree facts are game data)"
+    },
+    "entered_by": {
+     "type": "array",
+     "description": "a Black Spirit card: how it is entered on the file's spec(s) — by its own skill's command, or played by a base skill's press under the Black Spirit gate",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "mechanism",
+       "action",
+       "from_action",
+       "base_card",
+       "input",
+       "conditions",
+       "gate"
+      ],
+      "properties": {
+       "mechanism": {
+        "type": "string",
+        "enum": [
+         "own skill",
+         "base press"
+        ]
+       },
+       "action": {
+        "type": "string"
+       },
+       "from_action": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "base_card": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "description": "the base skill the gate names (IsUseableBlackSpritSkillNo)"
+       },
+       "input": {
+        "type": "string"
+       },
+       "conditions": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/Condition"
+        }
+       },
+       "gate": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "the assumed tests in words; the Black Spirit gauge (CombineWavePoint) is assumed full"
+       }
+      }
+     }
+    },
+    "access": {
+     "type": "string",
+     "description": "key into `access_lists` (item 10)"
+    },
+    "timelines": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Timeline"
+     },
+     "description": "a no_damage card: one per way it is pressed"
+    },
+    "no_damage_reason": {
+     "type": "string"
+    },
+    "damage_gap": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "text",
+      "lines",
+      "message"
+     ],
+     "description": "a summon card: its damage lands through a summon and is not counted yet (\"needs value\"); `lines` are `damage_lines` ids with a null %",
+     "properties": {
+      "text": {
+       "type": "string"
+      },
+      "lines": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "message": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "action",
+        "f",
+        "name",
+        "keys"
+       ],
+       "properties": {
+        "action": {
+         "type": "string"
+        },
+        "f": {
+         "type": "number"
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "keys": {
+         "type": "array",
+         "items": {
+          "type": "integer"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "ReachedVia": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "from_skill",
+    "from_action",
+    "to_action",
+    "input",
+    "opens_f"
+   ],
+   "properties": {
+    "from_skill": {
+     "type": "string"
+    },
+    "from_action": {
+     "type": "string"
+    },
+    "to_action": {
+     "type": "string"
+    },
+    "input": {
+     "type": "string"
+    },
+    "opens_f": {
+     "type": [
+      "number",
+      "string",
+      "null"
+     ]
+    },
+    "via": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "plays": {
+     "type": [
+      "string",
+      "null"
+     ]
+    }
+   }
+  },
+  "Moment": {
+   "description": "What decides the frame a choice leaves its action at (item 3): at_once (the first frame), after_hit (right after hit `hit_index` of `of_hits`), window_open (a window opens at f; `after_branch`: an earlier branch on the same input owns the frames before; `window_of`: the window is another branch into the same action), action_end (the action plays to its end; `charge`: a charge held through; `flows`: the clip flows into its next part), release (held keys let go; `when` is the moment it lands). `f` is the clip frame of the action the choice leaves.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "kind",
+    "f"
+   ],
+   "properties": {
+    "kind": {
+     "type": "string",
+     "enum": [
+      "at_once",
+      "after_hit",
+      "window_open",
+      "action_end",
+      "release"
+     ]
+    },
+    "when": {
+     "type": "string",
+     "enum": [
+      "at_once",
+      "after_hit",
+      "window_open",
+      "action_end"
+     ]
+    },
+    "f": {
+     "type": "number"
+    },
+    "hit_index": {
+     "type": "integer"
+    },
+    "of_hits": {
+     "type": "integer"
+    },
+    "skips_hits": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     },
+     "minItems": 2,
+     "maxItems": 2
+    },
+    "after_branch": {
+     "type": "boolean"
+    },
+    "window_of": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "input",
+      "held"
+     ],
+     "properties": {
+      "input": {
+       "type": "string"
+      },
+      "held": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/Key"
+       }
+      }
+     }
+    },
+    "charge": {
+     "type": "boolean"
+    },
+    "flows": {
+     "type": "boolean"
+    },
+    "released": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "target": {
+     "type": "boolean",
+     "description": "the hop fires on a target in range (the best-case profile assumes one)"
+    },
+    "charge_keys": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     },
+     "description": "with `charge`: the held keys whose release fires a continuation (what the player holds through the charge)"
+    }
+   }
+  },
+  "Choice": {
+   "description": "One decision on the preset path: leave `from` for `to` on `input`; `moment` says what decides when, `how` says it in a player’s words.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "from",
+    "to",
+    "input",
+    "keys",
+    "released",
+    "moment",
+    "how",
+    "f"
+   ],
+   "properties": {
+    "from": {
+     "type": "string"
+    },
+    "to": {
+     "type": "string"
+    },
+    "input": {
+     "$ref": "#/definitions/Input"
+    },
+    "keys": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "released": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "moment": {
+     "$ref": "#/definitions/Moment"
+    },
+    "how": {
+     "type": "string",
+     "description": "this choice alone in a player’s words, frame-free"
+    },
+    "f": {
+     "type": "number"
+    }
+   }
+  },
+  "Cancel": {
+   "description": "A true cancel (item 5): the follow-up’s exit opens on the final action before the final hit. Leaving at `f` of `at` (ms_100 from the cast start; `segments` a `segment_lists` key) loses `lost_ticks` (export tick ids), hits `first_lost`..`of_ticks`; `lost_pct` is the confident % they carry, else null with the reason.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "at",
+    "f",
+    "segments",
+    "ms_100",
+    "lost_ticks",
+    "first_lost",
+    "of_ticks",
+    "lost_pct",
+    "lost_pct_reason",
+    "text"
+   ],
+   "properties": {
+    "at": {
+     "type": "string"
+    },
+    "f": {
+     "type": "number"
+    },
+    "segments": {
+     "type": "string"
+    },
+    "ms_100": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "lost_ticks": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "first_lost": {
+     "type": "integer"
+    },
+    "of_ticks": {
+     "type": "integer"
+    },
+    "lost_pct": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "lost_pct_reason": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "text": {
+     "type": "string"
+    }
+   }
+  },
+  "AccessEntry": {
+   "description": "One way into a preset or card (item 10): press (the skill’s own input from idle), skill_request (entered by a skill press SKILL_<n>), loop (from an earlier action of the same cast), other_skill / own_skill (a follow-up of an exported preset entering it). A follow-up entry names the preset and the index of its follow-up (which carries the action, frame, input and time). 0.5.1: press = FROM IDLE (an idle row enters it, `idle` the evidence); command = an entry outside the charts; from_skill = the actions entering it, per source skill (own = the preset’s skill, its loop included; all = every action of that skill).",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "kind"
+   ],
+   "properties": {
+    "kind": {
+     "type": "string",
+     "enum": [
+      "press",
+      "command",
+      "skill_request",
+      "loop",
+      "other_skill",
+      "own_skill",
+      "from_skill",
+      "hotbar"
+     ]
+    },
+    "input": {
+     "$ref": "#/definitions/Input"
+    },
+    "keys": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "not_keys": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Key"
+     }
+    },
+    "request": {
+     "type": "string"
+    },
+    "skill_no": {
+     "type": "integer"
+    },
+    "from_action": {
+     "type": "string"
+    },
+    "from_preset": {
+     "type": "string"
+    },
+    "from_card": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "f": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "action": {
+     "type": "string"
+    },
+    "followup": {
+     "type": "integer",
+     "description": "index into the from_preset’s followups"
+    },
+    "idle": {
+     "type": "array",
+     "description": "press: the idle rows that enter the action (evidence)",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "action",
+       "raw_row",
+       "input"
+      ],
+      "properties": {
+       "action": {
+        "type": "string"
+       },
+       "raw_row": {
+        "type": "string"
+       },
+       "input": {
+        "$ref": "#/definitions/Input"
+       }
+      }
+     }
+    },
+    "card": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "own": {
+     "type": "boolean"
+    },
+    "actions": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "all": {
+     "type": "boolean",
+     "description": "every action of that skill the file exports enters it"
+    },
+    "of": {
+     "type": "integer"
+    },
+    "ultimate": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "name"
+       ],
+       "properties": {
+        "id": {
+         "type": "integer"
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     ],
+     "description": "entered through a route-only Ultimate (its command opens this route into the base card)"
+    },
+    "skills": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "routes": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "enum": [
+        "plain",
+        "ultimate"
+       ]
+      }
+     },
+     "description": "from_skill: per entering action, the routes it enters by (a route-only Ultimate’s command, plainly, or both)"
+    },
+    "weapon_switch": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "name"
+       ],
+       "properties": {
+        "id": {
+         "type": "integer"
+        },
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     ],
+     "description": "press: the entry's command is the class's Awakening weapon switch, folded into this card (the input it adds)"
+    }
+   }
+  },
+  "Exit": {
+   "description": "An exit of a no-damage card’s timeline, measured from the CAST START at the earliest frame it opens",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "group",
+    "skill",
+    "to",
+    "input",
+    "at",
+    "f",
+    "segments",
+    "ms_100",
+    "cards",
+    "no_card",
+    "raw_row"
+   ],
+   "properties": {
+    "group": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "plain label: the card(s) it enters, the skill, or \"any skill on the hotbar\""
+    },
+    "skill": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "to": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "input": {
+     "$ref": "#/definitions/Input"
+    },
+    "at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "the action the follow-up leaves from"
+    },
+    "f": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "description": "the frame of `at` it opens at"
+    },
+    "segments": {
+     "type": "string",
+     "description": "key into `segment_lists`"
+    },
+    "ms_100": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "plays": {
+     "type": "string",
+     "description": "for a follow-up into a skill PRESS (`to` = SKILL_<n>): the action that press plays"
+    },
+    "cards": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     },
+     "description": "the card(s) the follow-up enters: the first damage of the action it enters, read by the card rule; several when its branches deal several (a `cards` id each)"
+    },
+    "no_card": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "why `cards` is empty ('no damage card: ...'), else null"
+    },
+    "hotbar": {
+     "type": "boolean",
+     "const": true,
+     "description": "any skill on the hotbar (a quickslot / console-slot press): one per preset or timeline, the earliest; no card"
+    },
+    "opens": {
+     "type": "string",
+     "enum": [
+      "at start",
+      "mid-action",
+      "at End"
+     ],
+     "description": "where in its action the hotbar row opens"
+    },
+    "grade": {
+     "$ref": "#/definitions/PublicGrade"
+    },
+    "raw_row": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "the engine row (group) the exit is on — not for display"
+    }
+   }
+  },
+  "Timeline": {
+   "description": "One press of a no-damage skill: its default path with nothing extra pressed, its segments (the cast), its exits from the cast start and `free_to_act` (the earliest exit into a skill).",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "graph_skill",
+    "entry",
+    "path",
+    "segments",
+    "ms_100",
+    "ends",
+    "choices",
+    "exits",
+    "free_to_act",
+    "free_to_act_reason"
+   ],
+   "properties": {
+    "graph_skill": {
+     "type": "string"
+    },
+    "entry": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "keys",
+      "not_keys",
+      "input"
+     ],
+     "properties": {
+      "keys": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/Key"
+       }
+      },
+      "not_keys": {
+       "type": "array",
+       "items": {
+        "$ref": "#/definitions/Key"
+       }
+      },
+      "input": {
+       "$ref": "#/definitions/Input"
+      },
+      "request": {
+       "type": "string"
+      }
+     }
+    },
+    "path": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "segments": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Segment"
+     }
+    },
+    "ms_100": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "ends": {
+     "type": "string"
+    },
+    "choices": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "from",
+       "to",
+       "input",
+       "f"
+      ],
+      "properties": {
+       "from": {
+        "type": "string"
+       },
+       "to": {
+        "type": "string"
+       },
+       "input": {
+        "$ref": "#/definitions/Input"
+       },
+       "f": {
+        "type": "number"
+       }
+      }
+     }
+    },
+    "exits": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/Exit"
+     }
+    },
+    "free_to_act": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "ms_100",
+        "group",
+        "skill",
+        "to",
+        "at",
+        "f",
+        "segments"
+       ],
+       "properties": {
+        "ms_100": {
+         "type": "number"
+        },
+        "group": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "skill": {
+         "type": "string"
+        },
+        "to": {
+         "type": "string"
+        },
+        "at": {
+         "type": "string"
+        },
+        "f": {
+         "type": "number"
+        },
+        "segments": {
+         "type": "string",
+         "description": "key into `segment_lists`"
+        }
+       }
+      }
+     ]
+    },
+    "free_to_act_reason": {
+     "type": [
+      "string",
+      "null"
+     ]
+    }
+   }
+  },
+  "Input": {
+   "description": "An input as structure (user, 2026-10-05): keys held / pressed / double-tapped, keys that must be up (`released`, hidden by default: `hide`), the skill command(s) by name, the hotbar, the window and End, `requires` and `assumed` in plain words, a one-line `text`; the condition text only in `raw`. 0.5.5: each command’s `keys` (the key combos that enter its skill, split into `held` / `press`; inferred), `quickslot_skills` (the skill a hotbar hop uses).",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "held",
+    "press",
+    "double",
+    "released",
+    "hide",
+    "commands",
+    "quickslot",
+    "window",
+    "end",
+    "requires",
+    "assumed",
+    "text",
+    "raw",
+    "quickslot_skills"
+   ],
+   "properties": {
+    "held": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "press": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "double": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "released": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "hide": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "commands": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "id",
+       "name",
+       "keys"
+      ],
+      "properties": {
+       "id": {
+        "type": "integer"
+       },
+       "name": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "keys": {
+        "type": "array",
+        "description": "the key combos entering the skill (its chain entries): `press` edge keys, `held` level keys — inferred",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "held",
+          "press"
+         ],
+         "properties": {
+          "held": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "press": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "quickslot": {
+     "type": "boolean"
+    },
+    "window": {
+     "anyOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "array",
+       "items": {
+        "type": "number"
+       },
+       "minItems": 2,
+       "maxItems": 2
+      }
+     ]
+    },
+    "end": {
+     "type": "boolean"
+    },
+    "requires": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "assumed": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "text": {
+     "type": "string"
+    },
+    "raw": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "quickslot_skills": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "id",
+       "name"
+      ],
+      "properties": {
+       "id": {
+        "type": "integer"
+       },
+       "name": {
+        "type": [
+         "string",
+         "null"
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}
