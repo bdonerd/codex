@@ -1,4 +1,6 @@
 'use client';
+import { Moon, Sun } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function ThemeToggle() {
   const flip = () => {
@@ -13,6 +15,9 @@ export default function ThemeToggle() {
     }
   };
   return (
-    <button type="button" onClick={flip} aria-label="Switch light or dark theme">Light / dark</button>
+    <Button type="button" variant="ghost" size="icon" onClick={flip} aria-label="Switch light or dark theme" title="Light / dark">
+      <Sun aria-hidden className="dark:hidden" />
+      <Moon aria-hidden className="hidden dark:block" />
+    </Button>
   );
 }

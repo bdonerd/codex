@@ -1,8 +1,8 @@
 {
  "$schema": "http://json-schema.org/draft-07/schema#",
- "$id": "bdo-skill-export/0.5.6",
+ "$id": "bdo-skill-export/0.5.7",
  "title": "BdoExport",
- "description": "The website's data export, schema 0.5.6. Three documents per game build: one ClassExport per class (and spec), the Manifest, and the Golden vectors. docs/export-format.md is the prose companion (ids, grades, changelog).",
+ "description": "The website's data export, schema 0.5.7. Three documents per game build: one ClassExport per class (and spec), the Manifest, and the Golden vectors. docs/export-format.md is the prose companion (ids, grades, changelog).",
  "anyOf": [
   {
    "$ref": "#/definitions/ClassExport"
@@ -972,7 +972,9 @@
     "true_cancel",
     "cancel",
     "raw_row",
-    "ultimate"
+    "ultimate",
+    "route",
+    "shadow"
    ],
    "properties": {
     "group": {
@@ -1109,7 +1111,13 @@
        }
       }
      ],
-     "description": "entered through a route-only Ultimate (its command opens this route into the base card)"
+     "description": "entered through a route-only Ultimate (its command opens this route into the base card) 0.5.7: set only for a real Ultimate (route kind `ultimate`); see `route`."
+    },
+    "route": {
+     "$ref": "#/definitions/Route"
+    },
+    "shadow": {
+     "$ref": "#/definitions/Shadow"
     }
    }
   },
@@ -1151,7 +1159,8 @@
     "via_hotbar",
     "how_fallback",
     "timed",
-    "weapon_switch"
+    "weapon_switch",
+    "route"
    ],
    "properties": {
     "skill": {
@@ -1188,6 +1197,29 @@
         "$ref": "#/definitions/Key"
        },
        "description": "the entry keys that must stay down after the entry (press vs hold)"
+      },
+      "alternatives": {
+       "type": "array",
+       "items": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/Key"
+        }
+       },
+       "description": "0.5.7: other key sets that enter the first action the same way (same sources, same conditions but the keys): the how says 'K or K2' (Imminent Doom: LMB or RMB)"
+      },
+      "after": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "items": {
+        "type": "array",
+        "items": {
+         "$ref": "#/definitions/Key"
+        }
+       },
+       "description": "0.5.7: a route fold entered from the card's OWN cast: that cast's press keys, said first ('Press Shift + E, then press LMB'); else null"
       }
      }
     },
@@ -1431,7 +1463,7 @@
        }
       }
      ],
-     "description": "entered through a route-only Ultimate (its command opens this route into the base card)"
+     "description": "entered through a route-only Ultimate (its command opens this route into the base card) 0.5.7: set only for a real Ultimate (route kind `ultimate`); see `route`."
     },
     "requirements": {
      "type": "array",
@@ -1517,6 +1549,9 @@
       }
      ],
      "description": "entered through the class's Awakening weapon switch: its command only switches the weapon and hands off into this card (precedence 2, folded; the input stays on the entry)"
+    },
+    "route": {
+     "$ref": "#/definitions/Route"
     }
    }
   },
@@ -1581,7 +1616,7 @@
    "properties": {
     "schema": {
      "type": "string",
-     "const": "0.5.6"
+     "const": "0.5.7"
     },
     "build": {
      "type": "string",
@@ -1753,7 +1788,7 @@
    "properties": {
     "schema": {
      "type": "string",
-     "const": "0.5.6"
+     "const": "0.5.7"
     },
     "build": {
      "type": "string"
@@ -1867,7 +1902,7 @@
    "properties": {
     "schema": {
      "type": "string",
-     "const": "0.5.6"
+     "const": "0.5.7"
     },
     "build": {
      "type": "string"
@@ -2620,7 +2655,7 @@
        }
       }
      ],
-     "description": "entered through a route-only Ultimate (its command opens this route into the base card)"
+     "description": "entered through a route-only Ultimate (its command opens this route into the base card) 0.5.7: set only for a real Ultimate (route kind `ultimate`); see `route`."
     },
     "skills": {
      "type": "array",
@@ -2636,11 +2671,12 @@
        "type": "string",
        "enum": [
         "plain",
-        "ultimate"
+        "ultimate",
+        "skill"
        ]
       }
      },
-     "description": "from_skill: per entering action, the routes it enters by (a route-only Ultimate’s command, plainly, or both)"
+     "description": "from_skill: per entering action, the routes it enters by (a route-only Ultimate's command, another route-only skill's command — 0.5.7 `skill` — plainly, or a mix)"
     },
     "weapon_switch": {
      "anyOf": [
@@ -2668,6 +2704,12 @@
       }
      ],
      "description": "press: the entry's command is the class's Awakening weapon switch, folded into this card (the input it adds)"
+    },
+    "route": {
+     "$ref": "#/definitions/Route"
+    },
+    "shadow": {
+     "$ref": "#/definitions/Shadow"
     }
    }
   },
@@ -3102,6 +3144,88 @@
      }
     }
    }
+  },
+  "Route": {
+   "description": "0.5.7 (user, 2026-10-06): what the route a preset / follow-up / entry is entered through IS. kind `ultimate`: a route-only Ultimate (no input of its own, a combat-tree skill: Ultimate: Crow Flare); `skill`: any other route-only skill folded in (Succession: Imminent Doom, Core: X); `weapon_switch`: the class's Awakening weapon switch (presets and press entries only). `name` is the name to show.",
+   "anyOf": [
+    {
+     "type": "null"
+    },
+    {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "kind",
+      "id",
+      "name"
+     ],
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "ultimate",
+        "skill",
+        "weapon_switch"
+       ]
+      },
+      "id": {
+       "type": "integer"
+      },
+      "name": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "Shadow": {
+   "description": "0.5.7: SHADOWED — another exit of the same action accepts this input and opens earlier, so pressing or holding early takes it (reference case, measured in game 2026-10-06: Prime: Abyssal Flame's shot -> Shift + E plays the fast Imminent Doom only when pressed late). `kind` early: a press at or after this exit's opening takes this exit; covered: an earlier row is still open at the follow-up's moment. Inferred.",
+   "anyOf": [
+    {
+     "type": "null"
+    },
+    {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "to",
+      "cards",
+      "opens_f",
+      "kind",
+      "text"
+     ],
+     "properties": {
+      "to": {
+       "type": "string",
+       "description": "the pre-empting exit's target action"
+      },
+      "cards": {
+       "type": "array",
+       "items": {
+        "type": "integer"
+       }
+      },
+      "opens_f": {
+       "type": "number",
+       "description": "the frame the pre-empting exit opens (clip frames of the same action)"
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "early",
+        "covered"
+       ]
+      },
+      "text": {
+       "type": "string",
+       "description": "the player's words, frame-free"
+      }
+     }
+    }
+   ]
   }
  }
 }

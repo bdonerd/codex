@@ -5,7 +5,7 @@ import {
   type ClockTable, type Seg, type Speeds, ratePerSec, segMs,
 } from './clock';
 import type {
-  AccessRec, CardRec, FuRec, Inp, InputRec, LineRec, PresetRec, Requirement, SkillRec,
+  AccessRec, CardRec, FuRec, Inp, InputRec, LineRec, PresetRec, Requirement, RouteRec, SkillRec,
 } from './view';
 
 /** The part of the page data a page needs (a slice of the class view). */
@@ -205,6 +205,26 @@ export function reqAs(x: InputWords, ul: string | null | undefined, spec: string
   return out;
 }
 
+// ---- the route a preset or follow-up is entered by --------------------------
+
+/** Its chips: from the export's `route` when it gives one (an Ultimate;
+ * a weapon switch by its name; a skill by its name as the export gives
+ * it), else from the older Ultimate / weapon-switch fields. */
+export function routeChips(ro: RouteRec | null | undefined, ult?: string | null, ws?: string | null): ChipData[] {
+  if (ro) {
+    if (ro.k === 'ultimate') return [{ cls: 'chip c-ult', label: 'Ultimate', title: ro.n || undefined }];
+    if (ro.k === 'weapon_switch') return [{ cls: 'chip c-ult', label: ro.n || 'Weapon switch' }];
+    return [{ cls: 'chip c-ult', label: ro.n || (ro.k === 'skill' ? 'Skill' : ro.k) }];
+  }
+  const out: ChipData[] = [];
+  if (ult) out.push({ cls: 'chip c-ult', label: 'Ultimate', title: ult });
+  if (ws) out.push({ cls: 'chip c-ult', label: 'Weapon switch', title: ws });
+  return out;
+}
+
+/** the name a requirement may repeat, already shown as the route chip */
+export const routeName = (ro: RouteRec | null | undefined, ult?: string | null) => (ro ? ro.n : ult) || null;
+
 // ---- numbers ---------------------------------------------------------------
 
 export const fmt = (x: number | null | undefined, d = 0) =>
@@ -298,7 +318,7 @@ export function timeFus(D: Pick<Slice, 'clock' | 'segs'>, cool: Set<string>, lis
 export function mergeFus(D: Pick<Slice, 'skills' | 'cards' | 'idName'>, fus: TimedFu[]): TimedFu[] {
   const best = new Map<string, TimedFu>();
   for (const f of fus) {
-    const k = [f.cool ? 'cool' : '', f.un ? 'un' : '', f.ul ? 'ult:' + f.ul : '', fuName(D, f), inp(f.i, D.idName).plain].join('|');
+    const k = [f.cool ? 'cool' : '', f.un ? 'un' : '', f.ul ? 'ult:' + f.ul : '', f.ro ? `route:${f.ro.k}:${f.ro.n}` : '', fuName(D, f), inp(f.i, D.idName).plain].join('|');
     const b = best.get(k);
     if (!b || (f.t != null && (b.t == null || f.t < b.t))) best.set(k, f);
   }
@@ -379,7 +399,18 @@ export interface EntryItem {
   all: boolean;
   allUlt: boolean;
   anyUlt: boolean;
-  acts: { label: string; ult: 'only' | 'also' | null }[];
+  /** every action enters only by a named route-only skill: its name */
+  allRoute: string | null;
+  acts: {
+    label: string;
+    ult: 'only' | 'also' | null;
+    /** a named route-only skill ('Succession: …') it enters by: only by it, or also plainly */
+    route: { name: string; only: boolean } | null;
+    /** shadowed: press late (the texts) */
+    late: string[];
+  }[];
+  /** every shadow text of its entering exits */
+  late: string[];
 }
 export interface EntrySkills {
   head: string;
@@ -392,15 +423,29 @@ export function entrySkills(D: Pick<Slice, 'access' | 'cards' | 'skills'>, lists
   const idle = L.some((e) => e.k === 'press');
   const cmd = L.some((e) => e.k === 'command');
   const hot = L.some((e) => e.k === 'hotbar');
-  const src = new Map<string, { name: string; card?: string; own: boolean; all: boolean; acts: Map<string, Set<string>> }>();
+  const src = new Map<string, {
+    name: string; card?: string; own: boolean; all: boolean; acts: Map<string, Set<string>>;
+    rn: Record<string, string>; late: Map<string, Set<string>>; lateAll: Set<string>;
+  }>();
   for (const e of L) {
     if (e.k !== 'from_skill') continue;
     const isCard = Boolean(e.card && D.cards[e.card]);
     const name = isCard ? cardName(D, e.card as string) : e.name || skillName(D, e.sk ?? null);
-    if (!src.has(name)) src.set(name, { name, card: isCard ? e.card : undefined, own: Boolean(e.own), all: false, acts: new Map() });
+    if (!src.has(name)) {
+      src.set(name, { name, card: isCard ? e.card : undefined, own: Boolean(e.own), all: false, acts: new Map(), rn: {}, late: new Map(), lateAll: new Set() });
+    }
     const x = src.get(name)!;
     if (e.all === true) x.all = true;
     if (e.own) x.own = true;
+    Object.assign(x.rn, e.rn || {});
+    for (const sh of e.sh || []) {
+      x.lateAll.add(sh.t);
+      if (sh.a) {
+        const k = readable(sh.a);
+        if (!x.late.has(k)) x.late.set(k, new Set());
+        x.late.get(k)!.add(sh.t);
+      }
+    }
     for (const a of e.acts || []) {
       const k = readable(a);
       if (!x.acts.has(k)) x.acts.set(k, new Set());
@@ -408,17 +453,23 @@ export function entrySkills(D: Pick<Slice, 'access' | 'cards' | 'skills'>, lists
     }
   }
   const ultOnly = (rs: Set<string>) => rs.has('ultimate') && !rs.has('plain');
+  const skillOnly = (rs: Set<string>) => rs.has('skill') && !rs.has('plain') && !rs.has('ultimate');
   const items = [...src.values()]
     .sort((a, b) => Number(b.own) - Number(a.own) || a.name.localeCompare(b.name))
     .map((x) => {
       const rs = [...x.acts.values()];
+      const rname = x.rn.skill || null;
       return {
         name: x.name, card: x.card, own: x.own, all: x.all,
         anyUlt: rs.some((r) => r.has('ultimate')),
         allUlt: rs.length > 0 && rs.every(ultOnly),
+        allRoute: rname && rs.length > 0 && rs.every(skillOnly) ? rname : null,
         acts: [...x.acts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, r]) => ({
           label, ult: ultOnly(r) ? ('only' as const) : r.has('ultimate') ? ('also' as const) : null,
+          route: rname && r.has('skill') ? { name: rname, only: skillOnly(r) } : null,
+          late: [...(x.late.get(label) || [])],
         })),
+        late: [...x.lateAll],
       };
     });
   const head = [src.size ? String(src.size) : '', cmd ? 'skill command' : '', hot ? 'Hotbar' : ''].filter(Boolean).join(' · ') || (idle ? '' : 'unknown');

@@ -28,7 +28,9 @@ export type Inp = InputRec | string | null;
 /** A follow-up / exit: g group, s skill, to, at, i input, ms (at 100%),
  * sg segment list id, c cards, pl plays, nc no-card reason, of opens at,
  * cf/ca/ct/cp true-cancel frame/action/text/lost %, hb hotbar,
- * un unresolved, tc true cancel, ul Ultimate route. */
+ * un unresolved, tc true cancel, ul Ultimate route, ro the route it is
+ * entered by (when the export names one), sw shadowed: an earlier exit
+ * takes the same input, so the press must come late. */
 export interface FuRec {
   g: string | null;
   s: string | null;
@@ -49,6 +51,37 @@ export interface FuRec {
   un?: 1;
   tc?: 1;
   ul?: string;
+  ro?: RouteRec;
+  sw?: ShadowRec;
+}
+
+/** A shadowed exit: k 'early' / 'covered', t the plain-words text. */
+export interface ShadowRec {
+  k: string;
+  t: string;
+}
+
+/** the export's `shadow`, when it gives one */
+export function shadowRec(x: unknown): ShadowRec | null {
+  const r = (x && typeof x === 'object' ? (x as { shadow?: unknown }).shadow : null) as
+    { kind?: unknown; text?: unknown } | null | undefined;
+  if (!r || typeof r !== 'object' || typeof r.text !== 'string' || !r.text) return null;
+  return { k: typeof r.kind === 'string' ? r.kind : '', t: r.text };
+}
+
+/** The route a preset or follow-up is entered by: k its kind
+ * ('ultimate', 'weapon_switch', 'skill'), n its name. */
+export interface RouteRec {
+  k: string;
+  n: string | null;
+}
+
+/** the export's `route`, when it gives one */
+export function routeRec(x: unknown): RouteRec | null {
+  const r = (x && typeof x === 'object' ? (x as { route?: unknown }).route : null) as
+    { kind?: unknown; name?: unknown } | null | undefined;
+  if (!r || typeof r !== 'object' || typeof r.kind !== 'string') return null;
+  return { k: r.kind, n: typeof r.name === 'string' && r.name ? r.name : null };
 }
 
 export interface SkillRec {
@@ -146,6 +179,7 @@ export interface PresetRec {
   reqs: (Requirement | string)[] | null;
   dist: string | null;
   fu: FuRec[];
+  ro?: RouteRec;
 }
 
 export interface AccessRec {
@@ -166,6 +200,10 @@ export interface AccessRec {
   all?: boolean;
   own?: boolean;
   dist?: string;
+  /** from_skill: its entering exits that are shadowed (a: the action, when known) */
+  sh?: { a: string | null; k: string; t: string }[];
+  /** from_skill: the name of each named route it enters by ('skill' -> 'Succession: …') */
+  rn?: Record<string, string>;
 }
 
 /** exit windows of an action: clip start / end, [lo, hi, target skills] */
@@ -264,6 +302,10 @@ export function fuRec(f: FuLike, skills: Record<string, unknown>): FuRec {
   else if (unresolved(f as Record<string, unknown>, skills)) r.un = 1;
   if (f.true_cancel) r.tc = 1;
   if (f.ultimate) r.ul = f.ultimate.name || 'Ultimate';
+  const ro = routeRec(f);
+  if (ro) r.ro = ro;
+  const sw = shadowRec(f);
+  if (sw) r.sw = sw;
   return r;
 }
 
@@ -346,6 +388,8 @@ export const KNOWN_DROPS = [
   'access entry: loop (Entry Skills cover it)',
   'action: no clock rate (its paths show untimed)',
   'gate: no plain words after the dash',
+  // the same shadow shows on the follow-up row in the source card's section
+  'shadow: on an entry whose card Entry Skills do not list',
 ] as const;
 const SHOWN_ACCESS = new Set(['press', 'command', 'skill_request', 'from_skill', 'hotbar']);
 const DROPPED_ACCESS = new Set(['other_skill', 'own_skill', 'loop']);
@@ -466,6 +510,7 @@ export function slim(doc: ClassExport, gold: Golden['files'][string] | undefined
         .map((k) => pp[k]).find((v) => Array.isArray(v) && v.length) as PresetRec['reqs']) ?? null,
       dist: plainDist(p.distinguishing),
       fu: (p.followups || []).map((f) => fuRec(f, doc.skills)),
+      ...(routeRec(p) ? { ro: routeRec(p) as RouteRec } : {}),
     };
   });
 
@@ -481,11 +526,35 @@ export function slim(doc: ClassExport, gold: Golden['files'][string] | undefined
     return s in cards ? s : (asOf[s] ?? s);
   };
   const access: Record<string, AccessRec[]> = {};
+  const presetByKey = new Map(doc.presets.map((p) => [p.key, p]));
   for (const [lid, entries] of ents(doc.access_lists || {})) {
     for (const e of entries) {
       if (DROPPED_ACCESS.has(e.kind)) drop(drops, `access entry: ${e.kind} (Entry Skills cover it)`);
       else if (!SHOWN_ACCESS.has(e.kind)) drop(drops, `access entry kind not shown: ${e.kind}`);
     }
+    // an entry Entry Skills leave out may be shadowed, or name the route it
+    // enters by: carried onto the shown entry of the same card
+    const byCard = new Map<string, { sh: Map<string, { a: string | null; k: string; t: string }>; rn: Record<string, string> }>();
+    for (const e of entries) {
+      if (e.kind === 'from_skill') continue;
+      const sw = shadowRec(e);
+      const ro = routeRec(e);
+      if (!sw && !(ro && ro.n)) continue;
+      const k = cardKey(e.from_card);
+      if (k == null) {
+        if (sw) drop(drops, 'shadow: on an entry with no card');
+        continue;
+      }
+      if (!byCard.has(k)) byCard.set(k, { sh: new Map(), rn: {} });
+      const x = byCard.get(k)!;
+      if (sw) {
+        const fu = e.followup == null ? undefined : (presetByKey.get(e.from_preset as string)?.followups || [])[e.followup];
+        const a = fu?.at ?? null;
+        x.sh.set(`${a}|${sw.k}|${sw.t}`, { a, k: sw.k, t: sw.t });
+      }
+      if (ro && ro.n) x.rn[ro.k] = ro.n;
+    }
+    const placed = new Set<string>();
     access[lid] = entries
       .filter((e) => !['other_skill', 'own_skill', 'loop'].includes(e.kind))
       .map((e: AccessEntry) => {
@@ -501,8 +570,15 @@ export function slim(doc: ClassExport, gold: Golden['files'][string] | undefined
           ['all', e.all], ['own', e.own], ['dist', plainDist(ee.distinguishing)]];
         const r: Record<string, unknown> = {};
         for (const [k, v] of pairs) if (v != null) r[k] = v;
+        const from = e.kind === 'from_skill' ? byCard.get(cardKey(e.card) ?? '') : undefined;
+        if (from) {
+          placed.add(cardKey(e.card) as string);
+          if (from.sh.size) r.sh = [...from.sh.values()];
+          if (Object.keys(from.rn).length) r.rn = from.rn;
+        }
         return r as AccessRec;
       });
+    for (const [k, x] of byCard) if (!placed.has(k) && x.sh.size) drop(drops, 'shadow: on an entry whose card Entry Skills do not list', x.sh.size);
   }
 
   const nopreset: Record<string, string> = {};

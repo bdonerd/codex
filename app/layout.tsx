@@ -18,9 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME }} />
       </head>
       <body>
-        <div className="wrap">
-          <nav className="site" aria-label="Site">
-            <Link className="home" href="/">Codex</Link>
+        <div className="mx-auto max-w-[980px] px-4 pt-2 pb-10">
+          <nav className="mb-3 flex items-center justify-between gap-3" aria-label="Site">
+            <Link className="font-semibold text-foreground no-underline hover:no-underline" href="/">Codex</Link>
             <ThemeToggle />
           </nav>
           {children}

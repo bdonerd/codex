@@ -35,4 +35,12 @@ the newest build that has it.
   slice each page needs.
 - `lib/present.ts`: names, inputs in plain words, damage totals,
   follow-up grouping.
-- `app/`: the pages; `components/`: their parts.
+- `lib/card-slice.ts`: a spec page holds every skill's name; each
+  skill's own data is a static file (`/cards/<class>/<spec>/<id>.json`)
+  loaded when its section opens.
+- `lib/rank.ts`: the leaderboard's ranks and tiers.
+- `app/`: the pages and the data files; `components/`: their parts;
+  `components/ui/`: shadcn/ui components (Tailwind CSS).
+
+`vercel.json` redirects the old per-skill addresses
+(`/<class>/<spec>/<id>-<name>/`) to the skill's section on its spec page.

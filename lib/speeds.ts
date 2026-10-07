@@ -9,3 +9,10 @@ export function speedValue(raw: unknown): number {
   if (!Number.isFinite(s)) return 100;
   return Math.min(SPEED_MAX, Math.max(SPEED_MIN, s));
 }
+
+/** The speeds a page starts at and Reset returns to: the class file's
+ * `speeds_default` (each field as a typed value would be), else 100. */
+export function defaultSpeeds(fromExport: unknown): { attack: number; casting: number; movement: number } {
+  const d = (fromExport && typeof fromExport === 'object' ? fromExport : {}) as Record<string, unknown>;
+  return { attack: speedValue(d.attack), casting: speedValue(d.casting), movement: speedValue(d.movement) };
+}

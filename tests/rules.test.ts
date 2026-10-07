@@ -7,7 +7,8 @@ import { speedsOf } from '../components/useSpeeds';
 import { DATA_DIR, classSpecs, loadView, specSeg } from '../lib/data';
 import type { ClassExport } from '../lib/export-types';
 import { damage, fmtRate, ge } from '../lib/present';
-import { SPEED_MAX, SPEED_MIN, speedValue } from '../lib/speeds';
+import { SPEED_MAX, SPEED_MIN, defaultSpeeds, speedValue } from '../lib/speeds';
+import { listData } from '../lib/data';
 import { type Drops, KNOWN_DROPS, slim, unknownDrops } from '../lib/view';
 
 describe('the schema', () => {
@@ -65,6 +66,21 @@ describe('speeds', () => {
     expect(speedValue({})).toBe(100);
     expect(speedsOf({ attack: '400', casting: 'x', movement: '75' })).toEqual({ attack: SPEED_MAX, casting: 100, movement: 75 });
   });
+});
+
+describe('the default speeds', () => {
+  it("come from the class file's speeds_default, else 100", () => {
+    expect(defaultSpeeds({ attack: 130, casting: 115, movement: 110 })).toEqual({ attack: 130, casting: 115, movement: 110 });
+    expect(defaultSpeeds({ attack: 120 })).toEqual({ attack: 120, casting: 100, movement: 100 });
+    expect(defaultSpeeds(null)).toEqual({ attack: 100, casting: 100, movement: 100 });
+    expect(defaultSpeeds({ attack: 'x', casting: 999, movement: -5 })).toEqual({ attack: 100, casting: SPEED_MAX, movement: SPEED_MIN });
+  });
+  for (const cs of classSpecs()) {
+    it(`are what each page starts at (${cs.cls} ${cs.spec})`, () => {
+      const doc = JSON.parse(readFileSync(join(cs.dir, cs.file), 'utf8')) as ClassExport;
+      expect(listData(cs.cls, specSeg(cs.spec)).speeds).toEqual(defaultSpeeds(doc.speeds_default));
+    });
+  }
 });
 
 describe('what the shaping leaves out', () => {

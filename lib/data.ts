@@ -10,6 +10,8 @@ import {
 import {
   type CardRec, type Drops, type PresetRec, type SkillRec, type View, slim, unknownDrops,
 } from './view';
+import type { CardPayload, SpecShared } from './card-slice';
+import { defaultSpeeds } from './speeds';
 
 export const DATA_DIR = join(process.cwd(), 'data');
 
@@ -123,6 +125,8 @@ export interface ListData {
   build: string;
   schema: string;
   counts: { damage: number; noDamage: number; summon: number; presets: number; followups: number };
+  /** the speeds the page starts at and Reset returns to */
+  speeds: { attack: number; casting: number; movement: number };
   cards: ListCard[];
   clock: ClockTable;
   segs: Record<string, Seg[]>;
@@ -175,6 +179,7 @@ export function listData(cls: string, specSegment: string): ListData {
       presets: V.presets.length,
       followups: V.presets.reduce((n, p) => n + p.fu.length, 0),
     },
+    speeds: defaultSpeeds(V.speeds),
     cards, clock: pickClock(V, Object.values(segs)), segs, rest,
   };
 }
@@ -247,4 +252,32 @@ export function fullSlice(V: View): Slice {
     class: V.class, spec: V.spec, skills: V.skills, clock: V.clock, lines: V.lines, presets: V.presets,
     segs: V.segs, access: V.access, xw: V.xw, cards: V.cards, idName: idNameOf(V), cool: coolOf(V), slugs: slugsOf(V),
   };
+}
+
+// ---- the spec page: shared names, and each card's data loaded on open ----------
+
+/** what every section of a spec page shares: names only */
+export function specShared(cls: string, specSegment: string): SpecShared {
+  const V = loadView(cls, specSegment);
+  const skills: SpecShared['skills'] = {};
+  for (const [k, s] of Object.entries(V.skills)) skills[k] = nameOnlySkill(s);
+  const cards: SpecShared['cards'] = {};
+  for (const [k, c] of Object.entries(V.cards)) cards[k] = nameOnlyCard(c);
+  return { class: V.class, spec: V.spec, skills, cards, idName: idNameOf(V), cool: coolOf(V), slugs: slugsOf(V) };
+}
+
+/** the card ids that have a section (and a data file) */
+export const cardIds = (cls: string, specSegment: string) => Object.keys(slugsOf(loadView(cls, specSegment)));
+
+/** one card's own data: with specShared it makes the card's slice */
+export function cardPayload(cls: string, specSegment: string, id: string): CardPayload {
+  const V = loadView(cls, specSegment);
+  const slug = slugsOf(V)[id];
+  if (!slug) throw new Error(`no card ${id} in ${cls}/${specSegment}`);
+  const d = cardData(cls, specSegment, slug);
+  const S = d.slice;
+  const card = S.cards[id];
+  const skills: CardPayload['skills'] = {};
+  for (const k of card.graph_skills) if (S.skills[k]) skills[k] = S.skills[k];
+  return { id, presets: d.presets, clock: S.clock, lines: S.lines, segs: S.segs, access: S.access, xw: S.xw, skills, card };
 }

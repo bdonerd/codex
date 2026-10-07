@@ -20,7 +20,7 @@ for (const cs of classSpecs()) {
   const params = cardParams(cs.cls, spec);
 
   describe(`${cs.cls} ${spec}`, () => {
-    it('has one page per card, with unique addresses', () => {
+    it('has one section per card, with unique addresses', () => {
       expect(params.length).toBe(L.cards.length);
       expect(new Set(params).size).toBe(params.length);
     });

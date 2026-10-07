@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { DEFAULT_SPEEDS, type Speeds } from '../lib/clock';
+import type { Speeds } from '../lib/clock';
 import { speedValue } from '../lib/speeds';
 
 export type SpeedInputs = Record<keyof Speeds, string>;
@@ -11,8 +11,9 @@ const asInputs = (s: Speeds): SpeedInputs => ({
 });
 
 /** The attack / casting / movement % the page times at, remembered in
- * this browser. Pages render at the defaults first. */
-export function useSpeeds(defaults: Speeds = DEFAULT_SPEEDS) {
+ * this browser. Pages render at the defaults first (the class's, from
+ * lib/speeds.ts defaultSpeeds); Reset returns to them. */
+export function useSpeeds(defaults: Speeds) {
   const [raw, setRaw] = useState<SpeedInputs>(asInputs(defaults));
   useEffect(() => {
     try {
@@ -36,7 +37,7 @@ export function useSpeeds(defaults: Speeds = DEFAULT_SPEEDS) {
   };
   /** shows the value in use once the field is left */
   const settle = () => set(asInputs(speedsOf(raw)));
-  return { raw, set, settle, speeds: speedsOf(raw), reset: () => set(asInputs(DEFAULT_SPEEDS)) };
+  return { raw, set, settle, speeds: speedsOf(raw), reset: () => set(asInputs(defaults)) };
 }
 
 export const speedsOf = (r: SpeedInputs): Speeds => ({
